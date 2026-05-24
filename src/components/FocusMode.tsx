@@ -453,6 +453,7 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsRunning(!isRunning)}
+            aria-label={isRunning ? "Pause timer" : "Start timer"}
             className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-sm transition cursor-pointer shadow-lg hover:scale-[1.01] active:scale-[0.99] ${
               isRunning 
                 ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/15' 
@@ -465,13 +466,14 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
               </>
             ) : (
               <>
-                <Play size={15} fill="white" /> Start Limit
+                <Play size={15} fill="white" /> Start Timer
               </>
             )}
           </button>
           
           <button
             onClick={handleReset}
+            aria-label="Reset timer"
             className="p-3.5 rounded-2xl bg-white/80 border border-purple-100 hover:bg-white hover:border-purple-200 text-slate-400 hover:text-purple-600 transition shadow-sm cursor-pointer"
             title="Reset timer"
           >

@@ -21,8 +21,9 @@ export default function WinsMomentum({ tasks, routines }: WinsMomentumProps) {
   
   const totalDopaminePts = taskPoints + routinePoints + activeFocusPoints;
 
-  // Streak focused on wellness and breathing resets instead of administrative grind
-  const recoveryStreak = totalDopaminePts > 0 ? 3 : 2;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const completedToday = completedRoutines.length;
+  const totalRoutineCount = routines.length;
 
   // Daily Energy Wins: spent focus resources calculated as self-care achievements
   const lowEnergyCount = completedTasks.filter(t => t.energyLevel === 'low').length;
@@ -69,15 +70,17 @@ export default function WinsMomentum({ tasks, routines }: WinsMomentumProps) {
         {/* Recovery Streak Panel */}
         <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 min-h-[155px] flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 font-mono">Recovery Streak</span>
+            <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 font-mono">Today's Routines</span>
             <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-500">
               <Heart size={14} className="fill-emerald-400 stroke-emerald-500 animate-pulse" />
             </div>
           </div>
           <div className="mt-3">
-            <h2 className="text-3.5xl font-black tracking-tight text-slate-800">{recoveryStreak} days</h2>
+            <h2 className="text-3.5xl font-black tracking-tight text-slate-800">
+              {completedToday}/{totalRoutineCount}
+            </h2>
             <p className="text-xs text-slate-500 font-sans font-semibold mt-2">
-              Consecutive days of checking in & mindful recovery resets
+              Routines completed today. No pressure — any number is a win.
             </p>
           </div>
         </div>

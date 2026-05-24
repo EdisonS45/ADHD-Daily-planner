@@ -12,7 +12,7 @@ import {
   X, CheckSquare, Dumbbell, Activity, ShieldCheck, HeartPulse, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { storage } from './lib/storage';
+import { storage, checkAndResetRoutinesIfNewDay } from './lib/storage';
 
 const DEFAULT_TASKS: Task[] = [
   { id: '1', text: 'Drink a cold glass of water', category: 'tiny-win', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() },
@@ -138,6 +138,11 @@ export default function App() {
   const handleEditRoutine = (id: string, updatedLabel: string) => {
     setRoutines(prev => prev.map(r => r.id === id ? { ...r, label: updatedLabel } : r));
   };
+
+  useEffect(() => {
+    const reset = checkAndResetRoutinesIfNewDay(routines, storage.saveRoutines);
+    if (reset !== routines) setRoutines(reset);
+  }, []);
 
   // Sync state changes with localStorage instantly (Auto-save)
   useEffect(() => {
@@ -327,13 +332,15 @@ export default function App() {
               {/* Overwhelm Toggle Button */}
               <button
                 onClick={() => setIsOverwhelmed(!isOverwhelmed)}
+                aria-label={isOverwhelmed ? "Exit overwhelmed mode" : "Activate overwhelmed mode"}
+                aria-pressed={isOverwhelmed}
                 className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl text-xs font-bold tracking-wider transition-all duration-500 cursor-pointer shadow-sm ${
                   isOverwhelmed 
                     ? 'bg-rose-100 text-rose-700 border border-rose-200 shadow-md shadow-rose-200/20' 
                     : 'bg-white/70 backdrop-blur-md border border-rose-100 hover:border-rose-200 text-rose-600 hover:bg-rose-50'
                 }`}
               >
-                <AlertOctagon size={14} className={isOverwhelmed ? "text-rose-700 animate-spin" : ""} />
+                <AlertOctagon size={14} className={isOverwhelmed ? "text-rose-700 animate-pulse" : ""} />
                 {isOverwhelmed ? "ACTIVE: NOISE DISMISSED" : "I'M OVERWHELMED"}
               </button>
 
@@ -613,6 +620,8 @@ export default function App() {
                             <div className="flex items-center gap-3.5 flex-1 min-w-0 mr-3">
                               <button
                                 onClick={() => toggleTaskCompletion(task.id)}
+                                aria-label={`Mark "${task.text}" as ${task.completed ? 'incomplete' : 'complete'}`}
+                                aria-pressed={task.completed}
                                 className={`w-6 h-6 rounded-lg border-2 transition-all flex items-center justify-center cursor-pointer ${
                                   task.completed
                                     ? 'border-emerald-500 bg-emerald-500 text-white shadow-xs'
@@ -650,6 +659,7 @@ export default function App() {
                               {!task.completed && (
                                 <button
                                   onClick={() => startFocusOnTask(task)}
+                                  aria-label={`Start focus session for: ${task.text}`}
                                   className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-purple-600 hover:text-white bg-purple-50 hover:bg-purple-600/95 border border-purple-100/70 hover:border-purple-600 transition-all duration-300 text-xs font-semibold cursor-pointer shadow-sm"
                                 >
                                   <Play size={10} fill="currentColor" />
@@ -659,6 +669,7 @@ export default function App() {
 
                               <button
                                 onClick={() => deleteTask(task.id)}
+                                aria-label={`Delete task: ${task.text}`}
                                 className="p-1.5 rounded-xl text-slate-350 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200 cursor-pointer"
                                 title="Dismiss thought"
                               >
@@ -841,7 +852,11 @@ export default function App() {
                )}
  
                {currentView === 'routines' && (
-                 <Routines routines={routines} onToggleRoutine={toggleRoutine} />
+                 <Routines routines={routines}
+                    onToggleRoutine={toggleRoutine}
+                    onAddRoutine={handleAddRoutine}
+                    onDeleteRoutine={handleDeleteRoutine}
+                    onEditRoutine={handleEditRoutine} />
                )}
  
                {currentView === 'wins' && (
@@ -899,7 +914,7 @@ export default function App() {
              {/* ADHD Micro Insights carousel with luxurious subtle glass overlay */}
              <div className="p-6 bg-purple-50/40 backdrop-blur-lg border border-purple-150/60 shadow-md shadow-purple-900/5 rounded-[28px] space-y-3">
                <span className="text-[10px] uppercase font-bold tracking-wider text-purple-600 font-mono flex items-center gap-1.5 font-semibold">
-                 <Compass size={11} className="animate-spin text-purple-600" />
+                 <Compass size={11} className="text-purple-600" />
                  SENSE-CHECK AFFIRMATION
                </span>
                
@@ -972,7 +987,8 @@ export default function App() {
             type="button"
             id="global-plus-button"
             onClick={() => setIsQuickAddOpen(true)}
-            className="fixed bottom-20 lg:bottom-6 right-6 z-[60] bg-gradient-to-br from-[#6D21A8] to-[#581C87] hover:from-purple-750 hover:to-[#581C87] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-purple-950/25 transition-all border border-white/20 cursor-pointer hover:scale-105 active:scale-95 duration-200 animate-bounce-subtle"
+            aria-label="Quick capture thought"
+            className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:bottom-6 right-6 z-[60] bg-gradient-to-br from-[#6D21A8] to-[#581C87] hover:from-purple-750 hover:to-[#581C87] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-purple-950/25 transition-all border border-white/20 cursor-pointer hover:scale-105 active:scale-95 duration-200 animate-bounce-subtle"
             title="Quick capture thought"
           >
             <Plus size={24} strokeWidth={2.5} />
@@ -1150,7 +1166,7 @@ export default function App() {
 
        {/* Floating Mobile Bottom Tab Bar (Only visible when not in pure Overwhelm sensory reset mode) */}
        {!isOverwhelmed && (
-         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 p-3 bg-white/80 backdrop-blur-xl border-t border-purple-100/60 shadow-[0_-10px_30px_rgba(107,33,168,0.08)] flex justify-around items-center">
+         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 pt-3 px-3 bg-white/80 backdrop-blur-xl border-t border-purple-100/60 shadow-[0_-10px_30px_rgba(107,33,168,0.08)] flex justify-around items-center" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
            <button
              onClick={() => setCurrentView('today')}
              className={`flex flex-col items-center gap-1 p-2 transition-all duration-300 cursor-pointer ${
@@ -1176,7 +1192,7 @@ export default function App() {
              }`}
            >
              <BrainCircuit size={18} />
-             <span className="text-[9px] font-bold">Dump</span>
+             <span className="text-[9px] font-bold">Capture</span>
            </button>
            <button
              onClick={() => setCurrentView('routines')}

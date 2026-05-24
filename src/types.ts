@@ -28,3 +28,13 @@ export interface AppState {
   isOverwhelmed: boolean;
   energyLevel: 'all' | 'low' | 'medium' | 'deep';
 }
+
+export interface WinRecord {
+  id: string;
+  text: string;
+  category: 'tiny-win' | 'deep-focus' | 'admin' | 'recovery' | 'routine';
+  energyLevel: 'low' | 'medium' | 'deep';
+  completedAt: string;
+}
+
+export type WinsArchive = Record<string, WinRecord[]>;

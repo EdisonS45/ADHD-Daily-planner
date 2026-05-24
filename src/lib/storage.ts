@@ -1,4 +1,4 @@
-import { Task, Routine } from '../types';
+import { Task, Routine, WinRecord, WinsArchive } from '../types';
 
 export interface PersistedState {
   tasks: Task[];
@@ -86,5 +86,59 @@ export const storage = {
     } catch (e) {
       console.error("Preferences save failed", e);
     }
+  },
+
+  loadWinsArchive: (): WinsArchive => {
+    try {
+      const saved = localStorage.getItem(`${STORAGE_PREFIX}wins_archive`);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.warn("Storage API failed, loading empty wins archive", e);
+      return {};
+    }
+  },
+
+  saveWinsArchive: (archive: WinsArchive) => {
+    try {
+      localStorage.setItem(`${STORAGE_PREFIX}wins_archive`, JSON.stringify(archive));
+    } catch (e) {
+      console.error("Wins archive save failed", e);
+    }
+  },
+
+  appendWinToArchive: (win: WinRecord) => {
+    try {
+      const archive = storage.loadWinsArchive();
+      const today = new Date().toISOString().split('T')[0];
+      if (!archive[today]) {
+        archive[today] = [];
+      }
+      if (!archive[today].some(item => item.id === win.id)) {
+        archive[today].push(win);
+      }
+      storage.saveWinsArchive(archive);
+    } catch (e) {
+      console.error("Append win to archive failed", e);
+    }
   }
 };
+
+export const checkAndResetRoutinesIfNewDay = (
+  routines: import('../types').Routine[],
+  saveRoutines: (r: import('../types').Routine[]) => void
+): import('../types').Routine[] => {
+  try {
+    const lastReset = localStorage.getItem('focusflow_last_routine_reset');
+    const today = new Date().toISOString().split('T')[0];
+    if (lastReset !== today) {
+      const reset = routines.map(r => ({ ...r, completed: false }));
+      saveRoutines(reset);
+      localStorage.setItem('focusflow_last_routine_reset', today);
+      return reset;
+    }
+    return routines;
+  } catch {
+    return routines;
+  }
+};
+

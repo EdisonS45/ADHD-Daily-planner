@@ -54,10 +54,11 @@ app.post("/api/brain-dump", async (req, res) => {
       const prompt = `Analyze the following chaotic brain dump of thoughts, worries, tasks, and notes from an ADHD user. 
 Unravel them into discrete, highly actionable, human-sized, low-friction tasks.
 Place each task into exactly one of these categories:
-- 'today' (things to focus on right now or today)
-- 'later' (non-urgent, someday)
-- 'tiny-win' (extremely low friction tasks like drinking water, breathing, stretching, taking a pill, tidying 1 item)
-- 'important' (highly critical, urgent, time-sensitive tasks)
+- 'tiny-win' (quick, low-friction tasks: drink water, stretch, take meds, tidy one item)
+- 'deep-focus' (tasks requiring concentration: writing, coding, studying, planning)
+- 'recovery' (self-care and rest: breathing, breaks, meditation, walking)
+- 'admin' (life admin and chores: bills, emails, errands, appointments)
+- 'routine' (daily habits and repeating rituals)
 
 Assign each an energy level:
 - 'low' (low physical/mental focus required)
@@ -89,7 +90,7 @@ Brain Dump Content:
               type: Type.OBJECT,
               properties: {
                 text: { type: Type.STRING },
-                category: { type: Type.STRING, enum: ["today", "later", "tiny-win", "important"] },
+                category: { type: Type.STRING, enum: ["tiny-win", "deep-focus", "recovery", "admin", "routine"] },
                 energyLevel: { type: Type.STRING, enum: ["low", "medium", "deep"] }
               },
               required: ["text", "category", "energyLevel"]
