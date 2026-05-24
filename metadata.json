@@ -1,0 +1,6 @@
+{
+  "name": "FocusFlow",
+  "description": "An ADHD cognitive support system designed to reduce overwhelm, guide focus, capture chaotic thoughts, and build dopamine momentum without guilt.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
