@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Task, Routine, AppState } from './types';
+import { Task, Routine, AppState, WinRecord, WinsArchive } from './types';
 import StartHere from './components/StartHere';
 import BrainDump from './components/BrainDump';
 import FocusMode from './components/FocusMode';
@@ -90,6 +90,13 @@ export default function App() {
 
   // Contextual Onboarding Clarity Switch
   const [showOnboarding, setShowOnboarding] = useState(prefs.showOnboarding);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [userName, setUserName] = useState<string>(() => storage.loadUserName() || '');
+  const [onboardingName, setOnboardingName] = useState('');
+  const [planningTime, setPlanningTime] = useState<'morning' | 'afternoon' | 'evening'>(() => storage.loadUserPlanningTime() || 'morning');
+  const [onboardingPlanningTime, setOnboardingPlanningTime] = useState<'morning' | 'afternoon' | 'evening'>('morning');
+  const [winsArchive, setWinsArchive] = useState<WinsArchive>(() => storage.loadWinsArchive());
+  const [isCarryForwardOpen, setIsCarryForwardOpen] = useState(false);
   
   const [activeFocusTask, setActiveFocusTask] = useState<Task | null>(null);
   const [currentInsightIdx, setCurrentInsightIdx] = useState(0);
@@ -172,18 +179,34 @@ export default function App() {
 
   // Filter tasks based on Overwhelm Reset and Energy choice
   const getFilteredTasks = () => {
-    const uncompleted = tasks.filter(t => !t.completed);
+    let uncompleted = tasks.filter(t => !t.completed);
     if (isOverwhelmed) {
       // Limit to max 1-3 tiny-win/recovery tasks to prevent visual and choice overload
       const pool = uncompleted.filter(t => t.category === 'tiny-win' || t.category === 'recovery');
-      return pool.length > 0 ? pool.slice(0, 3) : uncompleted.slice(0, 3);
+      uncompleted = pool.length > 0 ? pool.slice(0, 3) : uncompleted.slice(0, 3);
+    } else if (energyLevel !== 'all') {
+      uncompleted = uncompleted.filter(t => t.energyLevel === energyLevel);
     }
-
-    if (energyLevel !== 'all') {
-      return uncompleted.filter(t => t.energyLevel === energyLevel);
-    }
-
     return uncompleted;
+  };
+
+  // Partition filtered tasks into today and carryForward specifically for Today action board
+  const getPartitionedTasks = () => {
+    const uncompleted = getFilteredTasks();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const today: Task[] = [];
+    const carryForward: Task[] = [];
+
+    uncompleted.forEach(task => {
+      const taskDate = task.createdAt ? task.createdAt.substring(0, 10) : '';
+      if (taskDate === todayStr) {
+        today.push(task);
+      } else {
+        carryForward.push(task);
+      }
+    });
+
+    return { today, carryForward };
   };
 
   const handleAddTask = (e: React.FormEvent) => {
@@ -223,6 +246,17 @@ export default function App() {
           setTimeout(() => {
             setLastCompletedTaskName(null);
           }, 4000);
+
+          // Append to archive
+          const win: WinRecord = {
+            id: t.id,
+            text: t.text,
+            category: t.category,
+            energyLevel: t.energyLevel,
+            completedAt: new Date().toISOString()
+          };
+          storage.appendWinToArchive(win);
+          setWinsArchive(storage.loadWinsArchive());
         }
         return {
           ...t,
@@ -258,6 +292,17 @@ export default function App() {
   const finishFocusSession = (taskId: string, durationSeconds: number) => {
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {
+        // Append to archive first
+        const win: WinRecord = {
+          id: t.id,
+          text: t.text,
+          category: t.category,
+          energyLevel: t.energyLevel,
+          completedAt: new Date().toISOString()
+        };
+        storage.appendWinToArchive(win);
+        setWinsArchive(storage.loadWinsArchive());
+
         return {
           ...t,
           completed: true,
@@ -272,6 +317,19 @@ export default function App() {
   };
 
   const clearCompletedTasks = () => {
+    // Append all currently completed tasks to the archive if not already archived
+    const completed = tasks.filter(t => t.completed);
+    completed.forEach(t => {
+      const win: WinRecord = {
+        id: t.id,
+        text: t.text,
+        category: t.category,
+        energyLevel: t.energyLevel,
+        completedAt: t.completedAt || new Date().toISOString()
+      };
+      storage.appendWinToArchive(win);
+    });
+    setWinsArchive(storage.loadWinsArchive());
     setTasks(prev => prev.filter(t => !t.completed));
   };
 
@@ -344,9 +402,18 @@ export default function App() {
                 {isOverwhelmed ? "ACTIVE: NOISE DISMISSED" : "I'M OVERWHELMED"}
               </button>
 
+              {/* Dynamic Status Indicator Badge */}
               <span className="hidden md:inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-[10px] uppercase font-bold tracking-widest bg-white/60 backdrop-blur-md text-slate-500 border border-white/80">
-                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                Momentum Active
+                <span className={`w-2 h-2 rounded-full animate-pulse ${
+                  dopaminePoints === 0 && routines.filter(r => r.completed).length === 0 ? 'bg-slate-400' :
+                  dopaminePoints > 0 && dopaminePoints < 30 ? 'bg-amber-400' :
+                  dopaminePoints >= 30 && dopaminePoints < 75 ? 'bg-emerald-400' : 'bg-purple-500'
+                }`}></span>
+                {
+                  dopaminePoints === 0 && routines.filter(r => r.completed).length === 0 ? 'Ready to begin' :
+                  dopaminePoints > 0 && dopaminePoints < 30 ? 'Momentum building' :
+                  dopaminePoints >= 30 && dopaminePoints < 75 ? 'Flow active' : 'Peak momentum'
+                }
               </span>
             </div>
           </header>
@@ -549,11 +616,53 @@ export default function App() {
                       exit={{ opacity: 0 }}
                       className="space-y-6"
                     >
+                  {/* Time-Aware and Personalised Dashboard Title & Subtitle */}
                   <div className="flex flex-col gap-1">
-                    <h2 className="text-2xl font-black text-purple-950 tracking-tight font-sans">
-                      One step at a time.
-                    </h2>
-                    <p className="text-xs text-slate-500 font-semibold font-sans">Momentum follows action. Start gentle.</p>
+                    {(() => {
+                      if (!userName.trim()) {
+                        return (
+                          <>
+                            <h2 className="text-2xl font-black text-purple-950 tracking-tight font-sans">
+                              One step at a time.
+                            </h2>
+                            <p className="text-xs text-slate-500 font-semibold font-sans">Momentum follows action. Start gentle.</p>
+                          </>
+                        );
+                      }
+
+                      const hrs = new Date().getHours();
+                      let timeGreeting = "Good morning";
+                      if (hrs >= 12 && hrs < 17) {
+                        timeGreeting = "Good afternoon";
+                      } else if (hrs >= 17) {
+                        timeGreeting = "Good evening";
+                      }
+
+                      const formattedDate = new Date().toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long'
+                      });
+
+                      let subtitle = "Your day is wide open. Start with one small thing.";
+                      if (planningTime === 'afternoon') {
+                        subtitle = "Picking up mid-day. That's perfectly fine.";
+                      } else if (planningTime === 'evening') {
+                        subtitle = "Evening check-in. Let's close the day gently.";
+                      }
+
+                      return (
+                        <>
+                          <h2 className="text-2xl font-black text-purple-950 tracking-tight font-sans">
+                            {timeGreeting}, {userName}.
+                          </h2>
+                          <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-slate-400 capitalize">
+                            <span>{formattedDate}</span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-semibold font-sans mt-0.5">{subtitle}</p>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* START HERE recommendation module */}
@@ -581,7 +690,7 @@ export default function App() {
                           onClick={clearCompletedTasks}
                           className="text-xs text-slate-600 hover:text-purple-700 font-bold px-3 py-1.5 bg-white/85 border border-purple-100/50 rounded-xl cursor-pointer transition-all shadow-sm hover:border-purple-200"
                         >
-                          Wipe completed list
+                          Clear done tasks
                         </button>
                       )}
                     </div>
@@ -608,8 +717,12 @@ export default function App() {
 
                     {/* Task list container */}
                     <div className="space-y-3">
-                      {getFilteredTasks().length > 0 ? (
-                        getFilteredTasks().map((task) => (
+                      {(() => {
+                        const { today: todayTasks, carryForward: carryForwardTasks } = getPartitionedTasks();
+                        return (
+                          <>
+                            {todayTasks.length > 0 ? (
+                              todayTasks.map((task) => (
                           <motion.div
                             key={task.id}
                             layout
@@ -677,15 +790,109 @@ export default function App() {
                               </button>
                             </div>
                           </motion.div>
-                        ))
-                      ) : (
-                        <div className="py-14 text-center text-slate-400 text-xs font-semibold max-w-sm mx-auto">
-                          {energyLevel !== 'all' 
-                            ? `No tasks match the selected energy level right now. Shifting parameters is a great self-care choice!`
-                            : `Your action list is clean and open. Drop in a quiet thought or gentle routine step whenever you are ready.`}
-                        </div>
-                                 )}
-                     </div>
+                              ))
+                            ) : (
+                              <div className="py-14 text-center text-slate-400 text-xs font-semibold max-w-sm mx-auto font-sans">
+                                {energyLevel !== 'all' 
+                                  ? `No tasks match the selected energy level right now. Shifting parameters is a great self-care choice!`
+                                  : `Your action list today is clean and open. Drop in a quiet thought or gentle routine step whenever you are ready.`}
+                              </div>
+                            )}
+
+                            {carryForwardTasks.length > 0 && (
+                              <div className="mt-6 border-t border-purple-100/40 pt-5 font-sans">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsCarryForwardOpen(!isCarryForwardOpen)}
+                                  className="flex items-center justify-between w-full py-2 px-3 rounded-xl hover:bg-purple-50/50 transition duration-200 text-left cursor-pointer group"
+                                >
+                                  <span className="text-xs font-bold text-slate-400 group-hover:text-purple-650 transition">
+                                    Carried forward from earlier — {carryForwardTasks.length} {carryForwardTasks.length === 1 ? 'item' : 'items'}
+                                  </span>
+                                  <span className="text-xs text-slate-400 font-bold group-hover:text-purple-650 transition">
+                                    {isCarryForwardOpen ? '▲ Hide' : '▼ Show'}
+                                  </span>
+                                </button>
+                                
+                                {isCarryForwardOpen && (
+                                  <div className="space-y-3 mt-3.5">
+                                    {carryForwardTasks.map((task) => (
+                                      <motion.div
+                                        key={task.id}
+                                        layout
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex items-center justify-between p-4 bg-white/75 backdrop-blur-md hover:bg-white transition-all duration-300 rounded-2xl border border-white/90 shadow-xs hover:shadow-md hover:shadow-purple-900/5 group"
+                                      >
+                                        <div className="flex items-center gap-3.5 flex-1 min-w-0 mr-3">
+                                          <button
+                                            onClick={() => toggleTaskCompletion(task.id)}
+                                            aria-label={`Mark "${task.text}" as ${task.completed ? 'incomplete' : 'complete'}`}
+                                            aria-pressed={task.completed}
+                                            className={`w-6 h-6 rounded-lg border-2 transition-all flex items-center justify-center cursor-pointer ${
+                                              task.completed
+                                                ? 'border-emerald-500 bg-emerald-500 text-white shadow-xs'
+                                                : 'border-slate-300 hover:border-purple-500 text-transparent hover:bg-purple-50/30'
+                                            }`}
+                                          >
+                                            <Check size={13} strokeWidth={3.5} className={task.completed ? "block" : "hidden"} />
+                                          </button>
+
+                                          <span className={`text-[13px] md:text-sm font-semibold transition duration-300 font-sans leading-relaxed truncate ${
+                                            task.completed ? 'text-slate-400 line-through font-medium' : 'text-slate-850'
+                                          }`}>
+                                            {task.text}
+                                          </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          <span className={`hidden sm:inline-flex px-2.5 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${
+                                            task.category === 'tiny-win' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                            task.category === 'deep-focus' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
+                                            task.category === 'recovery' ? 'bg-amber-50 text-amber-700 border border-[#FFE7C4]' :
+                                            task.category === 'routine' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
+                                            'bg-[#F2EDFF]/60 border border-purple-100 text-purple-650 text-purple-600'
+                                          }`}>
+                                            {task.category === 'tiny-win' ? '🌸 Tiny Win' : 
+                                             task.category === 'deep-focus' ? '🧠 Focus' : 
+                                             task.category === 'recovery' ? '🌱 Reset' : 
+                                             task.category === 'routine' ? '☀️ Routine' : 'Life admin'}
+                                          </span>
+
+                                          <span className="hidden md:inline-block text-[10px] text-slate-400 font-bold px-1 font-sans">
+                                            {task.energyLevel === 'low' ? '⚡ Low' : task.energyLevel === 'medium' ? '⚡⚡ Med' : '⚡⚡⚡ High'}
+                                          </span>
+
+                                          {!task.completed && (
+                                            <button
+                                              onClick={() => startFocusOnTask(task)}
+                                              aria-label={`Start focus session for: ${task.text}`}
+                                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-purple-650 hover:text-white bg-purple-50 hover:bg-purple-600/95 border border-purple-100/70 hover:border-purple-600 transition-all duration-300 text-xs font-semibold cursor-pointer shadow-sm"
+                                            >
+                                              <Play size={10} fill="currentColor" />
+                                              Focus
+                                            </button>
+                                          )}
+
+                                          <button
+                                            onClick={() => deleteTask(task.id)}
+                                            aria-label={`Delete task: ${task.text}`}
+                                            className="p-1.5 rounded-xl text-slate-350 hover:text-rose-500 hover:bg-rose-50 transition-all duration-200 cursor-pointer"
+                                            title="Dismiss thought"
+                                          >
+                                            <Trash2 size={12} />
+                                          </button>
+                                        </div>
+                                      </motion.div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
 
                      {/* Small form to manual drop task if not overwhelmed */}
                     {!isOverwhelmed && (
@@ -860,7 +1067,7 @@ export default function App() {
                )}
  
                {currentView === 'wins' && (
-                 <WinsMomentum tasks={tasks} routines={routines} />
+                 <WinsMomentum tasks={tasks} routines={routines} winsArchive={winsArchive} />
                )}
              </AnimatePresence>
            </main>
@@ -1115,6 +1322,116 @@ export default function App() {
                     Release into safe slate list — Breathe out 🍃
                   </button>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Personalized ADHD Onboarding Dialog */}
+        <AnimatePresence>
+          {showOnboarding && (
+            <div className="fixed inset-0 z-55 overflow-y-auto flex items-center justify-center p-4 text-left font-sans">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-purple-950/35 backdrop-blur-xs" 
+              />
+              
+              <motion.div
+                initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 50, scale: 0.95 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                className="w-full max-w-md bg-white border border-purple-100 rounded-[32px] p-6 sm:p-8 space-y-6 shadow-2xl relative z-10 text-center"
+              >
+                {onboardingStep === 1 ? (
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <div className="mx-auto w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg shadow-purple-900/15">
+                        ⚡
+                      </div>
+                      <h2 className="text-xl font-black text-purple-950 tracking-tight font-sans">
+                        Before we begin — what should we call you?
+                      </h2>
+                      <p className="text-xs text-slate-500 font-sans font-medium">
+                        Just a first name. No password, no email, no cloud tracking.
+                      </p>
+                    </div>
+                    <div className="space-y-4">
+                      <input
+                        type="text"
+                        value={onboardingName}
+                        onChange={(e) => setOnboardingName(e.target.value)}
+                        placeholder="Your first name"
+                        className="w-full px-5 py-3.5 rounded-2xl bg-purple-50/20 border border-purple-100 text-sm font-sans focus:outline-none focus:border-purple-400 focus:bg-white text-slate-800 placeholder-slate-400 shadow-inner text-center transition-all"
+                      />
+                      <button
+                        type="button"
+                        disabled={onboardingName.trim().length < 2}
+                        onClick={() => setOnboardingStep(2)}
+                        className="w-full py-3.5 rounded-2xl bg-[#6D21A8] disabled:bg-[#ECE6FF] disabled:text-purple-300 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-purple-600/10 transition cursor-pointer font-sans"
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <h2 className="text-xl font-black text-purple-950 tracking-tight font-sans">
+                        Good to meet you, {onboardingName.trim()}.
+                      </h2>
+                      <p className="text-xs text-slate-500 font-sans font-semibold">
+                        When do you usually plan your day?
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3 font-sans">
+                      {(['morning', 'afternoon', 'evening'] as const).map((time) => {
+                        const details = {
+                          morning: { emoji: '☀️', title: 'Morning', desc: 'Gentle focus to startup the day' },
+                          afternoon: { emoji: '🌤️', title: 'Afternoon', desc: 'Mid-day reset & alignment' },
+                          evening: { emoji: '🌙', title: 'Evening', desc: 'Quiet reflection & setup' }
+                        }[time];
+
+                        return (
+                          <button
+                            key={time}
+                            type="button"
+                            onClick={() => setOnboardingPlanningTime(time)}
+                            className={`w-full p-4 rounded-2xl text-left border transition-all cursor-pointer flex items-center gap-4 ${
+                              onboardingPlanningTime === time
+                                ? 'bg-purple-50/70 border-purple-400 ring-2 ring-purple-100/30'
+                                : 'bg-slate-50/60 hover:bg-slate-100/60 border-slate-100/40 text-slate-650'
+                            }`}
+                          >
+                            <span className="text-2xl">{details.emoji}</span>
+                            <div className="flex-grow min-w-0">
+                              <div className="text-xs font-bold text-slate-800 leading-none">{details.title}</div>
+                              <div className="text-[10px] text-slate-500 mt-1 truncate font-medium">{details.desc}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmedName = onboardingName.trim();
+                        storage.saveUserName(trimmedName);
+                        storage.saveUserPlanningTime(onboardingPlanningTime);
+                        setUserName(trimmedName);
+                        setPlanningTime(onboardingPlanningTime);
+                        dismissOnboarding();
+                      }}
+                      className="w-full py-3.5 rounded-2xl bg-[#6D21A8] hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-purple-600/10 transition cursor-pointer font-sans"
+                    >
+                      Let's begin
+                    </button>
+                  </div>
+                )}
               </motion.div>
             </div>
           )}

@@ -120,6 +120,42 @@ export const storage = {
     } catch (e) {
       console.error("Append win to archive failed", e);
     }
+  },
+
+  loadUserName: (): string | null => {
+    try {
+      return localStorage.getItem(`${STORAGE_PREFIX}user_name`);
+    } catch (e) {
+      return null;
+    }
+  },
+
+  saveUserName: (name: string): void => {
+    try {
+      localStorage.setItem(`${STORAGE_PREFIX}user_name`, name.trim());
+    } catch (e) {
+      console.error("Save user name failed", e);
+    }
+  },
+
+  loadUserPlanningTime: (): 'morning' | 'afternoon' | 'evening' | null => {
+    try {
+      const saved = localStorage.getItem(`${STORAGE_PREFIX}planning_time`);
+      if (saved === 'morning' || saved === 'afternoon' || saved === 'evening') {
+        return saved;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  saveUserPlanningTime: (time: 'morning' | 'afternoon' | 'evening'): void => {
+    try {
+      localStorage.setItem(`${STORAGE_PREFIX}planning_time`, time);
+    } catch (e) {
+      console.error("Save planning time failed", e);
+    }
   }
 };
 

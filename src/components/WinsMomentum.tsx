@@ -1,14 +1,15 @@
 import React from 'react';
-import { Task, Routine } from '../types';
+import { Task, Routine, WinsArchive } from '../types';
 import { Award, Flame, Trophy, CheckCircle, Zap, Heart, Sparkles, Star } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface WinsMomentumProps {
   tasks: Task[];
   routines: Routine[];
+  winsArchive: WinsArchive;
 }
 
-export default function WinsMomentum({ tasks, routines }: WinsMomentumProps) {
+export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomentumProps) {
   const completedTasks = tasks.filter(t => t.completed);
   const completedRoutines = routines.filter(r => r.completed);
 
@@ -29,6 +30,29 @@ export default function WinsMomentum({ tasks, routines }: WinsMomentumProps) {
   const lowEnergyCount = completedTasks.filter(t => t.energyLevel === 'low').length;
   const mediumEnergyCount = completedTasks.filter(t => t.energyLevel === 'medium').length;
   const highEnergyCount = completedTasks.filter(t => t.energyLevel === 'deep').length;
+
+  // Helper to determine day label
+  const getDayLabel = (dateStr: string) => {
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayString = yesterday.toISOString().split('T')[0];
+
+    if (dateStr === todayString) return "Today";
+    if (dateStr === yesterdayString) return "Yesterday";
+    
+    try {
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const sortedDates = Object.keys(winsArchive || {}).sort((a, b) => b.localeCompare(a));
+  const totalWinsInArchive = Object.values(winsArchive || {}).reduce((acc, list) => acc + list.length, 0);
 
   return (
     <div className="space-y-8" id="wins-view">
@@ -169,7 +193,7 @@ export default function WinsMomentum({ tasks, routines }: WinsMomentumProps) {
               <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 font-mono">Completed Wins Timeline</span>
               <h3 className="text-base font-black tracking-tight text-slate-800 mt-1">Tiny Victory Wall</h3>
             </div>
-            {completedTasks.length > 0 && (
+            {totalWinsInArchive > 0 && (
               <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                 <Star size={10} fill="currentColor" />
                 Momentum Active
@@ -177,27 +201,40 @@ export default function WinsMomentum({ tasks, routines }: WinsMomentumProps) {
             )}
           </div>
 
-          {completedTasks.length > 0 ? (
-            <div className="space-y-3 max-h-[290px] overflow-y-auto pr-1">
-              {completedTasks.map((task, index) => (
-                <motion.div 
-                  key={task.id} 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between p-3.5 rounded-2xl bg-white/70 border border-purple-50/40 hover:border-purple-200 transition-all shadow-xs"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs border border-emerald-100 shrink-0">
-                      ✓
-                    </span>
-                    <span className="text-xs md:text-sm font-semibold text-slate-700 font-sans leading-relaxed">{task.text}</span>
+          {totalWinsInArchive > 0 ? (
+            <div className="space-y-6 max-h-[350px] overflow-y-auto pr-1">
+              {sortedDates.map((dateStr) => {
+                const dayWins = winsArchive[dateStr] || [];
+                if (dayWins.length === 0) return null;
+                return (
+                  <div key={dateStr} className="space-y-2">
+                    <h4 className="text-[11px] font-bold text-purple-950 font-sans tracking-tight sticky top-0 bg-purple-50/90 backdrop-blur-md py-1 px-2.5 rounded-lg border border-purple-100/40 inline-block">
+                      {getDayLabel(dateStr)}
+                    </h4>
+                    <div className="space-y-2.5">
+                      {dayWins.map((win, index) => (
+                        <motion.div 
+                          key={win.id} 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.03 }}
+                          className="flex items-center justify-between p-3.5 rounded-2xl bg-white/70 border border-purple-50/40 hover:border-purple-200 transition-all shadow-xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs border border-emerald-100 shrink-0 font-bold">
+                              ✓
+                            </span>
+                            <span className="text-xs md:text-sm font-semibold text-slate-700 font-sans leading-relaxed">{win.text}</span>
+                          </div>
+                          <span className="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-mono font-black scale-95 shrink-0">
+                            +15 Dopamine
+                          </span>
+                        </motion.div>
+                      ))}
+                    </div>
                   </div>
-                  <span className="text-[9px] bg-purple-100 text-purple-700 px-2 rounded-full font-mono font-black scale-95 shrink-0">
-                    +15 Dopamine
-                  </span>
-                </motion.div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="py-20 text-center text-slate-400 text-xs font-semibold max-w-sm mx-auto">
