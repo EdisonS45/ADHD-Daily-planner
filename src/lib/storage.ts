@@ -167,6 +167,20 @@ export const checkAndResetRoutinesIfNewDay = (
     const lastReset = localStorage.getItem('focusflow_last_routine_reset');
     const today = new Date().toISOString().split('T')[0];
     if (lastReset !== today) {
+      // Loop through completed routines and archive them before resetting
+      routines.forEach(r => {
+        if (r.completed) {
+          const win: WinRecord = {
+            id: r.id,
+            text: r.label,
+            category: 'routine',
+            energyLevel: 'low',
+            completedAt: new Date().toISOString()
+          };
+          storage.appendWinToArchive(win);
+        }
+      });
+
       const reset = routines.map(r => ({ ...r, completed: false }));
       saveRoutines(reset);
       localStorage.setItem('focusflow_last_routine_reset', today);
