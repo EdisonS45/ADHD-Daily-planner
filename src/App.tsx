@@ -15,11 +15,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { storage, checkAndResetRoutinesIfNewDay } from './lib/storage';
 
 const DEFAULT_TASKS: Task[] = [
-  { id: '1', text: 'Drink a cold glass of water', category: 'tiny-win', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() },
-  { id: '2', text: 'Step outside for 2 minutes of direct daylight', category: 'recovery', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() },
-  { id: '3', text: 'Outline the core features for FocusFlow app', category: 'deep-focus', energyLevel: 'deep', completed: false, createdAt: new Date().toISOString() },
-  { id: '4', text: 'Review feedback from UX specialist', category: 'admin', energyLevel: 'medium', completed: false, createdAt: new Date().toISOString() },
-  { id: '5', text: 'Put desktop items away in drawers', category: 'admin', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() }
+  { id: '1', text: 'Drink a full glass of water', category: 'tiny-win', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() },
+  { id: '2', text: 'Step outside for 2 minutes of fresh air', category: 'recovery', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() },
+  { id: '3', text: 'Write down one thing you need to do today', category: 'admin', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() },
+  { id: '4', text: 'Tidy one small area — desk, bag, or drawer', category: 'tiny-win', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() },
+  { id: '5', text: 'Take three slow, deep breaths right now', category: 'recovery', energyLevel: 'low', completed: false, createdAt: new Date().toISOString() }
 ];
 
 const DEFAULT_ROUTINES: Routine[] = [
@@ -97,6 +97,7 @@ export default function App() {
   const [onboardingPlanningTime, setOnboardingPlanningTime] = useState<'morning' | 'afternoon' | 'evening'>('morning');
   const [winsArchive, setWinsArchive] = useState<WinsArchive>(() => storage.loadWinsArchive());
   const [isCarryForwardOpen, setIsCarryForwardOpen] = useState(false);
+  const [isEveningBannerDismissed, setIsEveningBannerDismissed] = useState(false);
   
   const [activeFocusTask, setActiveFocusTask] = useState<Task | null>(null);
   const [currentInsightIdx, setCurrentInsightIdx] = useState(0);
@@ -148,7 +149,10 @@ export default function App() {
 
   useEffect(() => {
     const reset = checkAndResetRoutinesIfNewDay(routines, storage.saveRoutines);
-    if (reset !== routines) setRoutines(reset);
+    if (reset !== routines) {
+      setRoutines(reset);
+      setWinsArchive(storage.loadWinsArchive());
+    }
   }, []);
 
   // Sync state changes with localStorage instantly (Auto-save)
@@ -303,6 +307,11 @@ export default function App() {
         storage.appendWinToArchive(win);
         setWinsArchive(storage.loadWinsArchive());
 
+        setLastCompletedTaskName(t.text);
+        setTimeout(() => {
+          setLastCompletedTaskName(null);
+        }, 4000);
+
         return {
           ...t,
           completed: true,
@@ -353,6 +362,12 @@ export default function App() {
         return { label: 'Life admin', class: 'bg-slate-100 text-slate-700 border border-slate-200' };
     }
   };
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const completedRoutines = routines.filter(r => r.completed);
+  const todayTotalWins = (winsArchive[todayStr]?.length ?? 0) + completedRoutines.length;
+  const isEveningRange = new Date().getHours() >= 18;
+  const showEveningBanner = !isOverwhelmed && isEveningRange && todayTotalWins >= 1 && !isEveningBannerDismissed;
 
   const dopaminePoints = tasks.filter(t => t.completed).length * 15 + routines.filter(r => r.completed).length * 10;
 
@@ -418,6 +433,8 @@ export default function App() {
             </div>
           </header>
         )}
+
+
 
         {/* Dynamic Layout Engine */}
         <AnimatePresence mode="wait">
@@ -665,6 +682,52 @@ export default function App() {
                     })()}
                   </div>
 
+                  {/* Evening Wrap-Up Closing Ritual Banner */}
+                  <AnimatePresence>
+                    {showEveningBanner && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                        className="p-6 bg-white/50 border border-amber-100/60 rounded-[32px] relative shadow-lg shadow-amber-500/5 flex flex-col md:flex-row md:items-center justify-between gap-6 overflow-hidden"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setIsEveningBannerDismissed(true)}
+                          className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition cursor-pointer"
+                          aria-label="Dismiss evening wrap-up"
+                        >
+                          <X size={15} />
+                        </button>
+
+                        <div className="space-y-1.5 max-w-md">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-amber-600 font-mono block">
+                            Evening wrap-up
+                          </span>
+                          <h3 className="text-xl font-black text-slate-800 tracking-tight leading-tight">
+                            You showed up today, {userName || 'friend'}.
+                          </h3>
+                          <p className="text-sm font-black text-amber-600">
+                            {todayTotalWins} things done today
+                          </p>
+                          <p className="text-xs text-slate-500 font-medium font-sans">
+                            {(winsArchive[todayStr]?.length ?? 0)} tasks · {completedRoutines.length} routines completed
+                          </p>
+                        </div>
+
+                        <div className="shrink-0 self-start md:self-center">
+                          <button
+                            type="button"
+                            onClick={() => setCurrentView('wins')}
+                            className="px-6 py-3.5 rounded-2xl bg-[#5C4D6B] hover:bg-purple-950 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-[#5C4D6B]/15 hover:shadow-purple-950/20 transition-all duration-300 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                          >
+                            See your full wins →
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {/* START HERE recommendation module */}
                   <StartHere
                     tasks={tasks}
@@ -790,7 +853,29 @@ export default function App() {
                               </button>
                             </div>
                           </motion.div>
-                              ))
+                            ))
+                            ) : (tasks.length > 0 && tasks.every(t => t.completed)) ? (
+                              <div className="p-8 bg-white/50 backdrop-blur-xl border border-emerald-100/60 rounded-[32px] text-center space-y-4">
+                                <div className="text-4xl animate-bounce">🎉</div>
+                                <h4 className="text-2xl font-black text-slate-800">You cleared everything.</h4>
+                                <p className="text-sm font-semibold text-slate-600 max-w-md mx-auto leading-relaxed">
+                                  That's a real win, {userName || 'friend'}. Your brain did hard things today.
+                                </p>
+                                <div className="inline-block">
+                                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-black">
+                                    {(winsArchive[todayStr]?.length ?? tasks.filter(t => t.completed).length)} tasks completed today
+                                  </span>
+                                </div>
+                                <div className="pt-2">
+                                  <button
+                                    type="button"
+                                    onClick={clearCompletedTasks}
+                                    className="px-5 py-2.5 rounded-xl border border-slate-300 hover:border-slate-400/80 font-bold text-xs text-slate-600 hover:bg-slate-150/40 transition cursor-pointer"
+                                  >
+                                    Start fresh tomorrow
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
                               <div className="py-14 text-center text-slate-400 text-xs font-semibold max-w-sm mx-auto font-sans">
                                 {energyLevel !== 'all' 
@@ -1055,7 +1140,7 @@ export default function App() {
                )}
  
                {currentView === 'brain-dump' && (
-                 <BrainDump onAddTasks={handleAddTasksFromDump} />
+                 <BrainDump onAddTasks={handleAddTasksFromDump} onSuccessCallback={() => setCurrentView('today')} />
                )}
  
                {currentView === 'routines' && (
@@ -1437,7 +1522,9 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Elegant Task Completion Dopamine Celebration Toast */}
+        {/* Onboarding and configuration modal */}
+
+        {/* Subtle Task Completion Bottom Toast */}
         <AnimatePresence>
           {lastCompletedTaskName && (
             <motion.div
@@ -1454,7 +1541,7 @@ export default function App() {
                 </span>
                 <div className="flex-1 min-w-0">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-purple-300 block font-mono">Dopamine Unlocked +15 pts</span>
-                  <div className="text-[13px] font-bold text-slate-100 truncate mt-0.5 leading-snug">
+                  <div className="text-[13px] font-bold text-slate-100 truncate mt-0.5 leading-snug font-sans">
                     "{lastCompletedTaskName}"
                   </div>
                   <span className="text-[10px] text-slate-300 block mt-0.5 font-medium">Goal achieved! Let the reward settle. 🍃</span>

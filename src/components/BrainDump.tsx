@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface BrainDumpProps {
   onAddTasks: (newTasks: Omit<Task, 'id' | 'completed' | 'createdAt'>[]) => void;
+  onSuccessCallback?: () => void;
 }
 
 interface ExtractedTask {
@@ -13,7 +14,7 @@ interface ExtractedTask {
   energyLevel: 'low' | 'medium' | 'deep';
 }
 
-export default function BrainDump({ onAddTasks }: BrainDumpProps) {
+export default function BrainDump({ onAddTasks, onSuccessCallback }: BrainDumpProps) {
   const [text, setText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedTask[]>([]);
@@ -93,6 +94,9 @@ export default function BrainDump({ onAddTasks }: BrainDumpProps) {
     setText('');
     setExtracted([]);
     setSaveStatus('success');
+    if (onSuccessCallback) {
+      onSuccessCallback();
+    }
     setTimeout(() => setSaveStatus(null), 3000);
   };
 

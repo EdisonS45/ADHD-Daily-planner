@@ -1,6 +1,6 @@
 import React from 'react';
 import { Task, Routine, WinsArchive } from '../types';
-import { Award, Flame, Trophy, CheckCircle, Zap, Heart, Sparkles, Star } from 'lucide-react';
+import { Award, Flame, Trophy, CheckCircle, Zap, Heart, Sparkles, Star, Info } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface WinsMomentumProps {
@@ -28,7 +28,32 @@ function calcStreak(archive: WinsArchive): number {
   return streak;
 }
 
+function InfoTooltip({ content, dark = false }: { content: string; dark?: boolean }) {
+  return (
+    <div className="relative group/tooltip inline-block">
+      <button
+        type="button"
+        className={`p-1 rounded-full transition-colors cursor-help shrink-0 ${
+          dark 
+            ? 'text-purple-200 hover:text-white hover:bg-white/10' 
+            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+        }`}
+        aria-label="Information"
+      >
+        <Info size={14} />
+      </button>
+      <div 
+        className="absolute right-0 top-7 hidden group-hover/tooltip:block z-50 w-64 p-3.5 rounded-2xl shadow-xl border text-xs leading-relaxed font-sans font-medium transition-all duration-200 bg-slate-900 text-slate-100 border-slate-800 shadow-slate-950/40"
+      >
+        <div className="absolute right-3 -top-1.5 w-3 h-3 bg-slate-900 border-t border-l border-slate-800 rotate-45" />
+        <div className="relative z-10 text-left normal-case tracking-normal">{content}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomentumProps) {
+  const [showAllWins, setShowAllWins] = React.useState(false);
   const completedTasks = tasks.filter(t => t.completed);
   const completedRoutines = routines.filter(r => r.completed);
 
@@ -44,11 +69,6 @@ export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomen
   const todayStr = new Date().toISOString().split('T')[0];
   const completedToday = completedRoutines.length;
   const totalRoutineCount = routines.length;
-
-  // Daily Energy Wins: spent focus resources calculated as self-care achievements
-  const lowEnergyCount = completedTasks.filter(t => t.energyLevel === 'low').length;
-  const mediumEnergyCount = completedTasks.filter(t => t.energyLevel === 'medium').length;
-  const highEnergyCount = completedTasks.filter(t => t.energyLevel === 'deep').length;
 
   // Helper to determine day label
   const getDayLabel = (dateStr: string) => {
@@ -236,12 +256,17 @@ export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomen
       {/* THREE THEMED REWARD WIDGETS */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* Momentum Trail Map Card */}
-        <div className="p-6 rounded-[28px] bg-gradient-to-br from-purple-600 to-indigo-700 text-white min-h-[155px] flex flex-col justify-between shadow-lg shadow-purple-950/15 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 blur-3xl pointer-events-none group-hover:scale-110 transition duration-700" />
-          <div className="flex items-center justify-between">
+        <div className="p-6 rounded-[28px] bg-gradient-to-br from-purple-600 to-indigo-700 text-white min-h-[155px] flex flex-col justify-between shadow-lg shadow-purple-950/15 relative group overflow-visible">
+          <div className="absolute inset-0 rounded-[28px] overflow-hidden pointer-events-none">
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 blur-3xl pointer-events-none group-hover:scale-110 transition duration-700" />
+          </div>
+          <div className="flex items-center justify-between relative z-10">
             <span className="text-[10px] uppercase font-black tracking-widest text-purple-200 font-mono">Momentum Trail</span>
-            <div className="p-1.5 bg-white/15 rounded-lg">
-              <Sparkles size={14} className="fill-purple-300 stroke-purple-100 animate-spin" />
+            <div className="flex items-center gap-2">
+              <InfoTooltip content="Your accumulated focus momentum points, combining completed tasks (+15) and routine actions (+10) to reward consistent neural activity." dark={true} />
+              <div className="p-1.5 bg-white/15 rounded-lg">
+                <Sparkles size={14} className="fill-purple-300 stroke-purple-100 animate-spin" />
+              </div>
             </div>
           </div>
           <div className="mt-3">
@@ -281,11 +306,14 @@ export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomen
         </div>
 
         {/* Day Streak & Routine Completion Panel */}
-        <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 min-h-[155px] flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
+        <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 min-h-[155px] flex flex-col justify-between relative overflow-visible">
+          <div className="flex items-center justify-between relative z-10">
             <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 font-mono">Day Streak</span>
-            <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-500">
-              <Flame size={14} className="fill-emerald-400 stroke-emerald-500 animate-pulse" />
+            <div className="flex items-center gap-2">
+              <InfoTooltip content="Your continuous sequence of active days. Tracks completed daily routines and objectives to form positive habits." />
+              <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-500">
+                <Flame size={14} className="fill-emerald-400 stroke-emerald-500 animate-pulse" />
+              </div>
             </div>
           </div>
           <div className="mt-2.5">
@@ -317,40 +345,46 @@ export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomen
         </div>
 
         {/* Total Victories Clearance */}
-        <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 min-h-[155px] flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 font-mono">Actions Completed</span>
-            <div className="p-1.5 bg-amber-50 rounded-lg text-amber-500">
-              <Trophy size={14} className="fill-amber-400 stroke-amber-500" />
+        <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 min-h-[155px] flex flex-col justify-between relative overflow-visible">
+          <div className="flex items-center justify-between relative z-10">
+            <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 font-mono">All-time wins</span>
+            <div className="flex items-center gap-2">
+              <InfoTooltip content="The total number of accomplishments ever recorded in your space, celebrating overall progress." />
+              <div className="p-1.5 bg-amber-50 rounded-lg text-amber-500">
+                <Trophy size={14} className="fill-amber-400 stroke-amber-500" />
+              </div>
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
               <h2 className="text-3.5xl font-black tracking-tight text-slate-800">
-                {completedTasks.length + completedRoutines.length}
+                {totalWinsInArchive}
               </h2>
               <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-100 rounded-lg px-2 py-0.5 font-sans leading-none">
-                {(completedTasks.length + completedRoutines.length) === 0 ? '✨ Slate Clean' :
-                 (completedTasks.length + completedRoutines.length) < 3 ? '🌸 Spark Lit' :
-                 (completedTasks.length + completedRoutines.length) < 6 ? '⚡ Steady Steps' :
-                 '🔥 Massive Triumph'}
+                {totalWinsInArchive === 0 ? '✨ Just starting' :
+                 totalWinsInArchive < 10 ? '🌸 Roots forming' :
+                 totalWinsInArchive < 30 ? '⚡ Growing fast' :
+                 '🔥 Unstoppable'}
               </span>
             </div>
             <p className="text-xs text-slate-500 font-sans font-semibold mt-2">
-              Scattered thoughts converted to spacious mental safety
+              Every action, permanently recorded. This number only grows.
             </p>
           </div>
         </div>
       </div>
 
       {/* 7-Day Activity Bar Chart Card */}
-      <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5">
-        <div className="flex flex-col gap-1 mb-4">
-          <span className="text-[10px] uppercase font-black tracking-widest text-[#6D21A8]/80 font-mono">7-Day Progress</span>
-          <h3 className="text-base font-black tracking-tight text-slate-800">Activity & Consistency</h3>
-          <p className="text-xs font-mono font-bold text-slate-500 mt-1">
-            This week: <span className="text-[#6D21A8] font-extrabold">{totalThisWeek}</span> {totalThisWeek === 1 ? 'action' : 'actions'} completed
-          </p>
+      <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 relative overflow-visible">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase font-black tracking-widest text-[#6D21A8]/80 font-mono">7-Day Progress</span>
+            <h3 className="text-base font-black tracking-tight text-slate-800">Activity & Consistency</h3>
+            <p className="text-xs font-mono font-bold text-slate-500 mt-1">
+              This week: <span className="text-[#6D21A8] font-extrabold">{totalThisWeek}</span> {totalThisWeek === 1 ? 'action' : 'actions'} completed
+            </p>
+          </div>
+          <InfoTooltip content="A rolling 7-day activity visualizer mapping your completed wins, giving you a clear view of your energy cycle/momentum peaks." />
         </div>
 
         <div className="w-full">
@@ -415,10 +449,13 @@ export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomen
       </div>
 
       {/* Personal Insights Panel */}
-      <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 space-y-5">
-        <div className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase font-black tracking-widest text-[#6D21A8]/80 font-mono font-sans font-bold">Patterns & insights</span>
-          <h3 className="text-base font-black tracking-tight text-slate-800">Mindset & habit metrics</h3>
+      <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 space-y-5 relative overflow-visible">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase font-black tracking-widest text-[#6D21A8]/80 font-mono font-sans font-bold">Patterns & insights</span>
+            <h3 className="text-base font-black tracking-tight text-slate-800">Mindset & habit metrics</h3>
+          </div>
+          <InfoTooltip content="Personalized behavioral metrics that highlight your mental strengths and tendencies, such as your favorite focus categories and most active calendar days." />
         </div>
 
         <div className="space-y-5.5 font-sans">
@@ -455,74 +492,28 @@ export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomen
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-12">
-        {/* COMPLIMENTARY WINS: Daily Energy Wins panel (4 columns on larger grids) */}
-        <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 lg:col-span-5 space-y-6">
+      {/* Standalone improved Victory Wall */}
+      <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 space-y-4 relative overflow-visible">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <span className="text-[10px] uppercase font-black tracking-widest text-purple-600 font-mono">Daily Energy Wins</span>
-            <h3 className="text-base font-black tracking-tight text-slate-800 mt-1">Focus Resources Spent</h3>
+            <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 font-mono">Completed Wins Timeline</span>
+            <h3 className="text-base font-black tracking-tight text-slate-800 mt-1 font-sans">Tiny Victory Wall</h3>
           </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-slate-600">
-                <span className="font-bold flex items-center gap-1.5">⚡ Gentle/Low Energy <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-mono">+{lowEnergyCount}</span></span>
-                <span className="text-[10px] font-sans text-slate-400">Momentum Builders</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-100/60 overflow-hidden">
-                <div 
-                  className="h-full bg-emerald-400 transition-all duration-1000" 
-                  style={{ width: `${Math.min((lowEnergyCount / 5) * 100, 100) || 8}%` }} 
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-slate-600">
-                <span className="font-bold flex items-center gap-1.5">⚡⚡ Moderate Focus <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md font-mono">+{mediumEnergyCount}</span></span>
-                <span className="text-[10px] font-sans text-slate-400">Regular Flow</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-100/60 overflow-hidden">
-                <div 
-                  className="h-full bg-purple-400 transition-all duration-1000" 
-                  style={{ width: `${Math.min((mediumEnergyCount / 5) * 100, 100) || 8}%` }} 
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-slate-600">
-                <span className="font-bold flex items-center gap-1.5">⚡⚡⚡ Concentrated Focus <span className="text-[10px] bg-rose-50 text-rose-600 border border-rose-100 px-1.5 py-0.5 rounded-md font-mono">+{highEnergyCount}</span></span>
-                <span className="text-[10px] font-sans text-slate-400">Concentration summits</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-100/60 overflow-hidden">
-                <div 
-                  className="h-full bg-rose-400 transition-all duration-1000" 
-                  style={{ width: `${Math.min((highEnergyCount / 3) * 100, 100) || 8}%` }} 
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* WINS WALL: Tiny Victory Wall & Completed Wins Timeline (7 columns on larger grids) */}
-        <div className="p-6 rounded-[28px] bg-white/40 backdrop-blur-xl border border-white/85 shadow-md shadow-purple-900/5 lg:col-span-7 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 font-mono">Completed Wins Timeline</span>
-              <h3 className="text-base font-black tracking-tight text-slate-800 mt-1">Tiny Victory Wall</h3>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <InfoTooltip content="A chronological log of all the miniature achievements you registered today and in past sessions. A visible reminder that you showed up." />
             {totalWinsInArchive > 0 && (
-              <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+              <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-200 px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 shadow-sm">
                 <Star size={10} fill="currentColor" />
                 Momentum Active
               </span>
             )}
           </div>
+        </div>
 
-          {totalWinsInArchive > 0 ? (
-            <div className="space-y-6 max-h-[350px] overflow-y-auto pr-1">
-              {sortedDates.map((dateStr) => {
+        {totalWinsInArchive > 0 ? (
+          <div className="space-y-6">
+            <div className="space-y-6 max-h-[450px] overflow-y-auto pr-1">
+              {(showAllWins ? sortedDates : sortedDates.slice(0, 2)).map((dateStr) => {
                 const dayWins = winsArchive[dateStr] || [];
                 if (dayWins.length === 0) return null;
                 return (
@@ -555,15 +546,29 @@ export default function WinsMomentum({ tasks, routines, winsArchive }: WinsMomen
                 );
               })}
             </div>
-          ) : (
-            <div className="py-20 text-center text-slate-400 text-xs font-semibold max-w-sm mx-auto">
-              <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-3">
-                <CheckCircle size={20} className="text-purple-300" />
+
+            {sortedDates.length > 2 && (
+              <div className="pt-2 flex justify-start">
+                <button
+                  onClick={() => setShowAllWins(!showAllWins)}
+                  className="text-xs font-bold text-[#6D21A8] bg-purple-50 hover:bg-purple-100 border border-purple-100 rounded-lg px-3 py-1.5 cursor-pointer transition"
+                >
+                  {showAllWins 
+                    ? 'Hide earlier days' 
+                    : `Show ${sortedDates.length - 2} earlier day${sortedDates.length - 2 === 1 ? '' : 's'}`
+                  }
+                </button>
               </div>
-              "Your space is calm right now. Add one tiny next step." complete a quick objective or routine to place a milestone.
+            )}
+          </div>
+        ) : (
+          <div className="py-20 text-center text-slate-400 text-xs font-semibold max-w-sm mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle size={20} className="text-purple-300" />
             </div>
-          )}
-        </div>
+            "Your space is calm right now. Add one tiny next step." complete a quick objective or routine to place a milestone.
+          </div>
+        )}
       </div>
 
       {/* FOOTER EMOTIONAL SUPPORT ROW */}

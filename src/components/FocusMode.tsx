@@ -133,6 +133,7 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
   const [duration, setDuration] = useState(15 * 60); 
   const [timeLeft, setTimeLeft] = useState(15 * 60);
   const [isRunning, setIsRunning] = useState(false);
+  const [timerFinished, setTimerFinished] = useState(false);
   const [affirmation, setAffirmation] = useState(AFFIRMATIONS[0]);
   const [showBreathing, setShowBreathing] = useState(false);
   const [breathPhase, setBreathPhase] = useState<'inhale' | 'hold' | 'exhale'>('inhale');
@@ -190,6 +191,7 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
         setTimeLeft((prev) => {
           if (prev <= 1) {
             setIsRunning(false);
+            setTimerFinished(true);
             if (timerRef.current) clearInterval(timerRef.current);
             return 0;
           }
@@ -231,6 +233,7 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
 
   const selectDuration = (minutes: number) => {
     const secs = minutes * 60;
+    setTimerFinished(false);
     setDuration(secs);
     setTimeLeft(secs);
     setIsRunning(false);
@@ -243,12 +246,14 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
   };
 
   const handleReset = () => {
+    setTimerFinished(false);
     setIsRunning(false);
     setTimeLeft(duration);
     secondsElapsedRef.current = 0;
   };
 
   const handleFinishCustom = () => {
+    setTimerFinished(false);
     if (activeTask) {
       onComplete(activeTask.id, secondsElapsedRef.current);
     }
@@ -293,7 +298,9 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
           <div className="p-5 rounded-2xl bg-purple-50/40 border border-purple-100/40 backdrop-blur-sm shadow-inner shadow-purple-900/5 flex items-start gap-3">
             <Heart size={18} className="text-purple-500 mt-0.5 flex-shrink-0 animate-pulse fill-purple-400" />
             <p className="text-xs md:text-sm text-slate-700 italic font-sans font-medium leading-relaxed">
-              "{affirmation}"
+              {timerFinished 
+                ? "You showed up. That's the hardest part — and you did it." 
+                : `"${affirmation}"`}
             </p>
           </div>
 
@@ -391,14 +398,23 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
                 strokeWidth="8"
                 fill="transparent"
                 strokeDasharray="603"
-                strokeDashoffset={603 - (603 * progressPercent) / 100}
+                strokeDashoffset={timerFinished ? 0 : 603 - (603 * progressPercent) / 100}
                 strokeLinecap="round"
               />
             </svg>
 
             {/* Middle Breathing Bubble */}
             <AnimatePresence mode="wait">
-              {showBreathing ? (
+              {timerFinished ? (
+                <div className="flex flex-col items-center justify-center z-10 text-center">
+                  <span className="text-5xl font-mono font-black text-emerald-600">
+                    ✓
+                  </span>
+                  <span className="text-xs uppercase text-emerald-600 font-mono font-bold mt-1">
+                    Time's up
+                  </span>
+                </div>
+              ) : showBreathing ? (
                 <motion.div
                   key={breathPhase}
                   initial={{ scale: breathPhase === 'inhale' ? 0.65 : breathPhase === 'hold' ? 1 : 1 }}
@@ -451,25 +467,27 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
       {/* Play Controls and Confirm Done */}
       <div className="border-t border-purple-100/50 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 z-10">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsRunning(!isRunning)}
-            aria-label={isRunning ? "Pause timer" : "Start timer"}
-            className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-sm transition cursor-pointer shadow-lg hover:scale-[1.01] active:scale-[0.99] ${
-              isRunning 
-                ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/15' 
-                : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/15'
-            }`}
-          >
-            {isRunning ? (
-              <>
-                <Pause size={15} fill="white" /> Pause Focus
-              </>
-            ) : (
-              <>
-                <Play size={15} fill="white" /> Start Timer
-              </>
-            )}
-          </button>
+          {!timerFinished && (
+            <button
+              onClick={() => setIsRunning(!isRunning)}
+              aria-label={isRunning ? "Pause timer" : "Start timer"}
+              className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-sm transition cursor-pointer shadow-lg hover:scale-[1.01] active:scale-[0.99] ${
+                isRunning 
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/15' 
+                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/15'
+              }`}
+            >
+              {isRunning ? (
+                <>
+                  <Pause size={15} fill="white" /> Pause Focus
+                </>
+              ) : (
+                <>
+                  <Play size={15} fill="white" /> Start Timer
+                </>
+              )}
+            </button>
+          )}
           
           <button
             onClick={handleReset}
@@ -484,10 +502,12 @@ export default function FocusMode({ activeTask, onComplete, onCancel }: FocusMod
         {activeTask && (
           <button
             onClick={handleFinishCustom}
-            className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/15 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+            className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/15 cursor-pointer hover:scale-[1.01] active:scale-[0.99] ${
+              timerFinished ? 'animate-pulse' : ''
+            }`}
           >
             <CheckCircle size={15} fill="rgba(255,255,255,0.2)" />
-            Completed Objective
+            {timerFinished ? 'Mark as done ✓' : 'Completed Objective'}
           </button>
         )}
       </div>
